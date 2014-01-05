@@ -59,7 +59,7 @@ readonly sourceRoots destinationRoots
 
 ## TODO: trap signals for cleanup, thinning, immutable archives, proper Sys-V init interaction (start, restart, stop, &c.) (see /etc/init.d/skeleton), ...
 
-function main ()
+function rsyncTimeMachineMain ()
 # The main() function is allowed to use globals. Others aren't. handle_rsync_error and post_backup_thinning fail due to poor flow control in main().
 {
 	if [ x"$1" == x"once" ]
@@ -90,14 +90,11 @@ function main ()
 	while { { [ "now" == "$1" ] && { verbose=v; shift; }; } ||  sleep $INTERVAL 2>/dev/null; }
 	do
 		local loopDate="$(date)"
-		echo "$ME: Beginning backup loop iteration ($loopDate)." 1>&2
+		echo "$ME: Beginning backup at $loopDate." 1>&2
 
-		#rsyncTimeMachineInto:fromRoot: "${destinationRoots[0]}" "${sourceRoots[0]}"
 		rsyncTimeMachineInto:BackupDBs:from:Roots: "${#destinationRoots[@]}" "${destinationRoots[@]}" "${#sourceRoots[@]}" "${sourceRoots[@]}"
 
-		#post_backup_thinning "${destinationRoots[0]}"
-
-		echo "$ME: Completed backup loop iteration ($loopDate)." 1>&2
+		echo "$ME: Completed backup from $loopDate." 1>&2
 		unset verbose # only useful for first iteration...
 	done
 
@@ -131,9 +128,9 @@ function rsyncTimeMachineInto:BackupDBs:from:Roots: ()
 	local eachBackupDB
 	for eachBackupDB in "${BackupDBs[@]}"
 	do
-		#pre_backup_thinning "${eachBackupDB}" 5GB
+		#rsyncTimeMachineThinBackupsForHost:inDB:atLeast: Sufa "${eachBackupDB}" 5GB # pre-backup thinning
 		rsyncTimeMachineInto:fromRoots: "${eachBackupDB}" "${SourceRoots[@]}"
-		#post_backup_thinning "${eachBackupDB}" 5GB
+		#rsyncTimeMachineThinBackupsForHost:inDB: Sufa "${eachBackupDB}" 5GB # post-backup thinning
 	done
 }
 
@@ -167,14 +164,14 @@ function rsyncTimeMachineInto:fromRoot: ()
 	(set -x # Log the actual command(s) used.
 	mkdir -m 0755 "$destinationTargetWithDate"
 	exec rsync -ahxyz${verbose:-}				\
-			--exclude="/.recycle" 					\
-			--exclude="/lost+found" 				\
-			--link-dest="../Latest"					\
-				"$sourceRoot/"						\
+			--exclude="/.recycle" 				\
+			--exclude="/lost+found" 			\
+			--link-dest="../Latest"				\
+				"$sourceRoot/"					\
 				"$destinationTarget/"
 	) || handle_rsync_error "$?"
 
-	#archive_backup "$destinationTarget" #TODO: lock ...WithDate too.
+	#rsyncTimeMachineArchiveBackup: "$destinationTarget" #TODO: lock ...WithDate too.
 
 	ln -fnsv "$perDate" "$destinationTargetForHost"/Latest
 }
@@ -190,7 +187,7 @@ function handle_rsync_error ()
 	return $1 # real error
 }
 
-function archive_backup ()
+function rsyncTimeMachineArchiveBackup: ()
 # This function locks down the backup to prevent it from being damaged. 
 {
 	###
@@ -208,7 +205,7 @@ function archive_backup ()
 		# Recursively set *all* files immutable.
 }
 
-function post_backup_thinning ()
+function rsyncTimeMachineThinBackupsForHost:inDB:atLeast: ()
 # This function [should/will] implements policy as to which backups to keep.
 {
 	# Current Policy: 	keep one backup per calendar month forever; 
@@ -218,6 +215,8 @@ function post_backup_thinning ()
 	#					(This assumes that the backup interval is six (6) minutes or similar, which is *very* frequent.)
 	
 	## CURRENT LIMITATION: Datemath is hard. So, I use calendar years, months, days, and hours. The policy is liberal enough that there should never be too *little*, but there will frequently be way too much. E.G., when run on YYYY:01:01T00:06:00Z, a huge amount of history will be deleted and the immediately prior backup will be a month old, but the current backup will have already been successful. 
+
+	df -h /path/to/backupdb/host
 	
 	if [ "true" != "$rsyncDidSucceed" ]; then
 		echo "Skipping post-backup thinning." 1>&2
@@ -254,4 +253,4 @@ function logit ()
 	#| tee -ai
 }
 
-main "$@" # never returns
+rsyncTimeMachineMain "$@" # never returns
