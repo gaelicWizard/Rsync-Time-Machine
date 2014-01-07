@@ -57,10 +57,10 @@ readonly ME="$SELF[$$]"
 readonly sourceRoots destinationRoots
 
 
-## TODO: trap signals for cleanup, thinning, immutable archives, proper Sys-V init interaction (start, restart, stop, &c.) (see /etc/init.d/skeleton), ...
+## TODO: trap signals for cleanup, thinning, immutable archives, proper Sys-V init interaction (start, restart, stop, &c.) (see /etc/init.d/skeleton), separate configuration file, ...
 
 function rsyncTimeMachineMain ()
-# The main() function is allowed to use globals. Others aren't. handle_rsync_error and post_backup_thinning fail due to poor flow control in main().
+# The main function is allowed to use globals. Others aren't. handle_rsync_error and post_backup_thinning fail due to poor flow control here.
 {
 	if [ x"$1" == x"once" ]
 	then
